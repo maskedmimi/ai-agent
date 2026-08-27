@@ -6,10 +6,11 @@ from langchain.agents import create_agent
 from .config import MODEL_NAME, SYSTEM_PROMPT
 from .tools.basics import TOOLS as BASIC_TOOLS
 from .tools.math_ops import TOOLS as MATH_TOOLS
+from .tools.rag import TOOLS as RAG_TOOLS
 
 # As you add more tool files (e.g. tools/math_ops.py, tools/data_science.py),
 # import their TOOLS list here and append to ALL_TOOLS.
-ALL_TOOLS = [*BASIC_TOOLS, *MATH_TOOLS]
+ALL_TOOLS = [*BASIC_TOOLS, *MATH_TOOLS, *RAG_TOOLS]
 
 
 def build_agent(model_name: str = MODEL_NAME):

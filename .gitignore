@@ -1,4 +1,38 @@
-venv/
+# --- Python ---
 __pycache__/
-*.pyc
+*.py[cod]
+*$py.class
+*.so
+
+# --- Virtual environment ---
+venv/
+.venv/
+env/
+ENV/
+
+# --- Environment variables / secrets ---
 .env
+*.env
+
+# --- RAG vector store (local embeddings, regenerate with build_resume_index.py) ---
+data/resume_index/
+
+# --- Personal data (don't commit your actual CV file) ---
+data/*.pdf
+data/*.md
+!data/.gitkeep
+
+# --- IDE / editor ---
+.vscode/
+.idea/
+*.swp
+
+# --- OS junk ---
+.DS_Store
+Thumbs.db
+
+# --- Jupyter ---
+.ipynb_checkpoints/
+
+# --- Logs ---
+*.log
