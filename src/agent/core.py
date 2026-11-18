@@ -13,10 +13,23 @@ from .tools.rag import TOOLS as RAG_TOOLS
 ALL_TOOLS = [*BASIC_TOOLS, *MATH_TOOLS, *RAG_TOOLS]
 
 
-def build_agent(model_name: str = MODEL_NAME):
-    """Create the local, tool-calling agent (Ollama-backed, no API key)."""
-    llm = ChatOllama(model=model_name)
-    return create_agent(model=llm, tools=ALL_TOOLS, system_prompt=SYSTEM_PROMPT)
+def build_agent(model_name: str = MODEL_NAME, tools: list | None = None, system_prompt: str | None = None):
+    """Create a local, tool-calling agent (Ollama-backed, no API key).
+
+    Defaults to the generic personal-agent tool set and system prompt, so
+    existing callers (chat.py, run_demo.py) are unaffected. Pass `tools=` /
+    `system_prompt=` to build a differently-scoped agent (e.g. the Toyota
+    voice assistant) without touching this function's defaults.
+    """
+    # qwen3 is a "thinking" model: by default it emits a full <think>...</think>
+    # reasoning block before every answer (and again on every tool round-trip),
+    # which is most of why responses feel slow. reasoning=False turns that off.
+    llm = ChatOllama(model=model_name, reasoning=False)
+    return create_agent(
+        model=llm,
+        tools=tools if tools is not None else ALL_TOOLS,
+        system_prompt=system_prompt if system_prompt is not None else SYSTEM_PROMPT,
+    )
 
 
 def ask(agent, question: str) -> str:

@@ -50,19 +50,36 @@ trusted to get that right on its own.
 
 ```
 ai-agent/
-├── src/agent/
-│   ├── config.py            # MODEL_NAME, SYSTEM_PROMPT
-│   ├── core.py               # build_agent(), ask() — aggregates all TOOLS
-│   └── tools/
-│       ├── basics.py
-│       ├── math_ops.py
-│       └── rag.py            # search_resume tool (RAG over my CV)
+├── src/
+│   ├── agent/
+│   │   ├── config.py          # MODEL_NAME, SYSTEM_PROMPT, TOYOTA_SYSTEM_PROMPT
+│   │   ├── core.py             # build_agent(tools=, system_prompt=) — aggregates ALL_TOOLS by default
+│   │   └── tools/
+│   │       ├── basics.py
+│   │       ├── math_ops.py
+│   │       ├── rag.py           # search_resume tool (RAG over my CV)
+│   │       ├── appointments.py  # Toyota demo: check_availability, book_appointment
+│   │       ├── faq.py           # Toyota demo: search_warranty_faq (RAG)
+│   │       └── handover.py      # Toyota demo: transfer_to_human
+│   └── voice/
+│       ├── stt.py               # faster-whisper wrapper
+│       └── tts.py               # Piper wrapper
 ├── scripts/
-│   ├── chat.py                     # interactive multi-turn CLI chat
+│   ├── chat.py                     # interactive multi-turn CLI chat (generic agent)
+│   ├── chat_toyota.py               # same, scoped to the Toyota persona (text-only)
+│   ├── voice_app.py                 # Gradio push-to-talk interface (Toyota persona)
 │   ├── run_demo.py                 # scripted, non-interactive demo
-│   └── build_resume_index.py       # one-off: builds the local vector index
+│   ├── build_resume_index.py       # one-off: builds the CV vector index
+│   └── build_faq_index.py          # one-off: builds the FAQ vector index
 ├── data/
-│   └── resume_index/         # persisted Chroma vector store (gitignored)
+│   ├── resume_index/         # persisted Chroma vector store (gitignored)
+│   ├── faq_index/            # persisted Chroma vector store, FAQ (gitignored)
+│   ├── faq/                  # fictional warranty/maintenance FAQ source docs
+│   ├── voices/               # Piper voice model (gitignored, re-downloadable)
+│   └── appointments.db       # SQLite RDV store (gitignored)
+├── docs/
+│   └── plan_toyota_voice_assistant.md
+├── tests/scenarios/          # V&V scenarios for the Toyota persona
 ├── requirements.txt
 └── README.md
 ```
@@ -140,6 +157,63 @@ learning value of a project like this:
 | RAG returned stale/wrong results after re-indexing | Chroma's `persist_directory` isn't cleared automatically between runs | `rm -rf data/resume_index` before rebuilding with a new source file |
 | "Skills" section not retrieved | Small document + low `TOP_K` meant relevant chunks could be excluded | Increased `TOP_K`; confirmed content directly via `store.get()` rather than assuming |
 
+## Toyota after-sales voice assistant (demo)
+
+A second agent persona, built on the same `core.build_agent()` mechanism
+but with its own restricted tool set and system prompt — a local,
+from-scratch reconstruction of what a platform like Cognigy provides,
+for an AYES/Toyota Motor Europe interview pitch. See
+`docs/plan_toyota_voice_assistant.md` for the full design and build log.
+
+- **Tools**: `check_availability` / `book_appointment` (SQLite-backed,
+  with a deterministic `confirme` gate — see below), `search_warranty_faq`
+  (RAG over a fictional FAQ), `transfer_to_human`.
+- **Voice**: `faster-whisper` (STT, French) → agent → Piper (TTS, French),
+  wired together in a push-to-talk Gradio interface.
+- **Text-only testing**: `scripts/chat_toyota.py` runs the same agent at
+  the keyboard, to validate the business logic before adding voice.
+
+```bash
+# One-time setup
+python -m piper.download_voices --download-dir data/voices fr_FR-siwis-medium
+python scripts/build_faq_index.py
+
+# Test the business logic in text
+python scripts/chat_toyota.py
+
+# Full voice demo
+python scripts/voice_app.py
+```
+
+**Bug found while testing**: with `reasoning=False` (needed for usable
+voice latency, see below), `qwen3:8b` would sometimes call
+`book_appointment` *before* asking the customer to confirm, and once even
+claimed a booking succeeded after the tool had actually returned a
+conflict error — i.e. it stopped reliably following the "confirm before
+booking" instruction once its chain-of-thought was turned off. Fixed by
+moving the gate into the tool itself: `book_appointment` takes a
+`confirme: bool` argument and refuses to write to the database unless it's
+`True`, returning a recap instead — so the ordering is enforced in
+deterministic code, not left to prompt compliance. Same principle as the
+rest of this project: the LLM proposes, the tool decides.
+
+**Bug found while testing (stalling instead of acting)**: on a garbled
+transcription ("Combien ne t'endure la garantie..." instead of "Combien de
+temps dure..."), the agent would sometimes answer "Je vais vérifier, un
+instant" and stop there — without ever calling `search_warranty_faq`. With
+reasoning disabled, the model occasionally produces this kind of filler
+response instead of either calling the tool or asking the customer to
+repeat. Fixed by adding an explicit rule to the system prompt: never
+announce an action without executing it in the same turn, and when input
+is unclear, ask the customer to repeat rather than guessing or stalling.
+Confirmed fixed on the same garbled input.
+
+**Dependency bug found while testing**: `pip install faster-whisper` pulls
+in the latest `av` (PyAV) by default, but `av>=19` removed the
+`metadata_errors` kwarg that `faster-whisper==1.2.1`'s audio decoder
+passes to `av.open()` — every transcription call crashed. Pinned
+`av==13.1.0` in `requirements.txt`.
+
 ## Roadmap
 
 - Discord bot integration
@@ -149,4 +223,5 @@ learning value of a project like this:
 
 ## Stack
 
-Python · LangChain · Ollama (Qwen3:8b) · Chroma · `nomic-embed-text` · WSL2
+Python · LangChain · Ollama (Qwen3:8b) · Chroma · `nomic-embed-text` ·
+`faster-whisper` · Piper · Gradio · WSL2

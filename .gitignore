@@ -16,11 +16,19 @@ ENV/
 
 # --- RAG vector store (local embeddings, regenerate with build_resume_index.py) ---
 data/resume_index/
+data/faq_index/
+
+# --- Toyota demo: local SQLite store, Piper voice model (re-download via piper.download_voices) ---
+data/appointments.db
+data/voices/
 
 # --- Personal data (don't commit your actual CV file) ---
 data/*.pdf
 data/*.md
 !data/.gitkeep
+
+# --- Private pitch prep notes (not for a public repo) ---
+docs/questions_entretien.md
 
 # --- IDE / editor ---
 .vscode/

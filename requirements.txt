@@ -258,3 +258,12 @@ websockets==15.0.1
 xxhash==3.8.1
 yarl==1.24.5
 zstandard==0.25.0
+
+# --- Toyota voice assistant demo ---
+faster-whisper==1.2.1
+piper-tts==1.8.0
+gradio==6.31.0
+# Pinned below faster-whisper's default resolution: av>=19 dropped the
+# `metadata_errors` kwarg that faster-whisper 1.2.1's decode_audio() passes
+# to av.open(), causing a hard crash on every transcription call.
+av==13.1.0
